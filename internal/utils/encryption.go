@@ -31,7 +31,7 @@ func Decrypt(plaintext []byte, DefaultKey string) (string, error) {
 	}()
 	bDK := []byte(DefaultKey)
 	bIV := []byte("420#abA%,ZfE79@M")
-	fmt.Println("pltxt: ", plaintext)
+	fmt.Println("pltxt: ", string(plaintext))
 	bPlaintext := []byte(plaintext)
 	block, _ := aes.NewCipher(bDK)
 	ciphertext := make([]byte, len(bPlaintext))
