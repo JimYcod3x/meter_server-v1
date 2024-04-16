@@ -7,7 +7,8 @@ import (
 )
 
 const (
-	tSub = "J23P000078C2S"
+	tSub1 = "J23P000078C2S"
+	tSub2 = "J23P0000542C2S"
 	tPub = "J200002335S2C"
 )
 
@@ -25,7 +26,9 @@ func Run(options *mqtt.Options) *mqtt.Server {
 
 
 
-	sev.Subscribe(tSub, 1, subFn)
+	sev.Subscribe(tSub1, 1, subFn)
+	sev.Subscribe(tSub2, 1, subFn)
+
 	return sev
 }
 
