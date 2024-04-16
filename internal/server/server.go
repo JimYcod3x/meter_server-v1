@@ -11,7 +11,7 @@ import (
 const (
 	tSub1 = "J23P000078C2S"
 	tSub2 = "J230008542C2S"
-	tSub3 = "J230008542C2S"
+	tSub3 = "J200002335C2S"
 	tPub = "J200002335S2C"
 )
 
