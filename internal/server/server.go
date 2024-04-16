@@ -1,6 +1,8 @@
 package server
 
 import (
+	"fmt"
+
 	"github.com/JimYcod3x/meter_server/internal/meter"
 	mqtt "github.com/mochi-mqtt/server/v2"
 	"github.com/mochi-mqtt/server/v2/packets"
@@ -8,7 +10,7 @@ import (
 
 const (
 	tSub1 = "J23P000078C2S"
-	tSub2 = "J23P0000542C2S"
+	tSub2 = "J230008542C2S"
 	tPub = "J200002335S2C"
 )
 
@@ -33,5 +35,6 @@ func Run(options *mqtt.Options) *mqtt.Server {
 }
 
 func subFn(cl *mqtt.Client, sub packets.Subscription, pk packets.Packet) {
+	fmt.Println(sub.Filter)
 	meter.GetMeterData(cl, sub, pk)
 }
