@@ -34,8 +34,8 @@ func (h *Hook) OnStarted() {
 
 }
 
-func (h *Hook) OnConnect(c *mqtt.Client, pk packets.Packet) error {
-	fmt.Println("client connected")
+func (h *Hook) OnConnect(cl *mqtt.Client, pk packets.Packet) error {
+	fmt.Println(cl.ID, "connected")
 	return nil
 }
 
