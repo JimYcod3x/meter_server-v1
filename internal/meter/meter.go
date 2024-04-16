@@ -38,7 +38,12 @@ func GetMeterData(cl *mqtt.Client, sub packets.Subscription, pk packets.Packet) 
 	fmt.Println(decryptPayload)
 
 	binDecry, _ := utils.HexToBinary(decryptPayload)
-
+	defer func() {
+		err := recover()
+		if err != nil {
+			fmt.Println("Error:", err)
+		}
+	}()
 	fmt.Println("binary get:", binDecry[0])
 	sliceArr := binDecry[0]
 	meterType := sliceArr[0:3]

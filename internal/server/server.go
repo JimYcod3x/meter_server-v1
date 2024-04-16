@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"github.com/JimYcod3x/meter_server/internal/meter"
@@ -37,5 +38,7 @@ func Run(options *mqtt.Options) *mqtt.Server {
 
 func subFn(cl *mqtt.Client, sub packets.Subscription, pk packets.Packet) {
 	fmt.Println(sub.Filter)
+	hexPayload := hex.EncodeToString([]byte(pk.Payload))
+	fmt.Println("hex payload", hexPayload)
 	meter.GetMeterData(cl, sub, pk)
 }
