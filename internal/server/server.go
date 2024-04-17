@@ -32,6 +32,7 @@ func Run(options *mqtt.Options) *mqtt.Server {
 
 	sev.Subscribe(tSub1, 1, subFn)
 	sev.Subscribe(tSub2, 1, subFn)
+	sev.Subscribe(tSub3, 1, subFn)
 
 	return sev
 }

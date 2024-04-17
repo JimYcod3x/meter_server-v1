@@ -77,3 +77,4 @@ func GetMeterType(meterType string) {
 		fmt.Println("This is not a meter")
 	}
 }
+
