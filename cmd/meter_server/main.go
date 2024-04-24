@@ -10,9 +10,7 @@ import (
 
 	"github.com/JimYcod3x/meter_server/internal/server"
 
-	mqtt "github.com/mochi-mqtt/server/v2"
 	"github.com/mochi-mqtt/server/v2/config"
-	"github.com/mochi-mqtt/server/v2/packets"
 )
 func main() {
 
