@@ -1,14 +1,6 @@
-package meter
+package packet
 
-const (
-	MeterRead Command = iota + 1
-	HalfHData
-	EvnetLog
-	APowerLineValue
 
-)
-
-type Command int
 
 type DataForm struct {
 	Identifier Indentifier
@@ -18,10 +10,18 @@ type DataForm struct {
 
 
 	type Indentifier struct {
-		MeterType MeterType
+		// MeterType *MeterType
 		PacketType PacketType
 	}
 
 	type PacketType struct {
 	}
+
+
+	// func GetCommandType(cmdType string) {
+	// 	if 
+	// 	switch cmdType {
+
+	// 	}
+	// }
 

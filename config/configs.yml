@@ -29,17 +29,17 @@ hooks:
   #     database: 1
   auth:
     allow_all: true
-    ledger:
-      auth:
-        - username: peach
-          password: password1
-          allow: true
-      acl:
-        - remote: 127.0.0.1:*
-        - username: melon
-          filters:
-          melon/#: 3
-          updates/#: 2
+    # ledger:
+      # auth:
+      #   - username: peach
+      #     password: password1
+      #     allow: true
+      # acl:
+      #   - remote: 127.0.0.1:*
+      #   - username: melon
+      #     filters:
+      #     melon/#: 3
+      #     updates/#: 2
 options:
   client_net_write_buffer_size: 2048
   client_net_read_buffer_size: 2048

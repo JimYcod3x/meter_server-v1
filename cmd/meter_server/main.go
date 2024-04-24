@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -9,9 +10,10 @@ import (
 
 	"github.com/JimYcod3x/meter_server/internal/server"
 
+	mqtt "github.com/mochi-mqtt/server/v2"
 	"github.com/mochi-mqtt/server/v2/config"
+	"github.com/mochi-mqtt/server/v2/packets"
 )
-
 func main() {
 
 	flag.Parse()
@@ -35,15 +37,31 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	sev := server.Run(options)
+	fmt.Println("server started: ", sev)
+	go func() {
+	
+	err := sev.Serve()
+	if err != nil {
+		log.Fatal(err)
+	}
+	}()
 
 	go func() {
-		err := sev.Serve()
-		if err != nil {
-			log.Fatal(err)
+		// Inline subscriptions can also receive retained messages on subscription.
+		_ = sev.Publish("direct/retained", []byte("retained message"), true, 0)
+		_ = sev.Publish("direct/alternate/retained", []byte("some other retained message"), true, 0)
+
+		// Subscribe to a filter and handle any received messages via a callback function.
+		callbackFn := func(cl *mqtt.Client, sub packets.Subscription, pk packets.Packet) {
+			sev.Log.Info("inline client received message from subscription", "client", cl.ID, "subscriptionId", sub.Identifier, "topic", pk.TopicName, "payload", string(pk.Payload))
 		}
+		sev.Log.Info("inline client subscribing")
+		_ = sev.Subscribe("direct/#", 1, callbackFn)
+		_ = sev.Subscribe("direct/#", 2, callbackFn)
 	}()
+
 
 	<-done
 	sev.Log.Warn("caught signal, stopping...")
