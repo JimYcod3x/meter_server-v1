@@ -48,19 +48,7 @@ func main() {
 	}
 	}()
 
-	go func() {
-		// Inline subscriptions can also receive retained messages on subscription.
-		_ = sev.Publish("direct/retained", []byte("retained message"), true, 0)
-		_ = sev.Publish("direct/alternate/retained", []byte("some other retained message"), true, 0)
 
-		// Subscribe to a filter and handle any received messages via a callback function.
-		callbackFn := func(cl *mqtt.Client, sub packets.Subscription, pk packets.Packet) {
-			sev.Log.Info("inline client received message from subscription", "client", cl.ID, "subscriptionId", sub.Identifier, "topic", pk.TopicName, "payload", string(pk.Payload))
-		}
-		sev.Log.Info("inline client subscribing")
-		_ = sev.Subscribe("direct/#", 1, callbackFn)
-		_ = sev.Subscribe("direct/#", 2, callbackFn)
-	}()
 
 
 	<-done
