@@ -2,8 +2,6 @@ package meter
 
 import (
 	"fmt"
-
-	"github.com/JimYcod3x/meter_server/internal/utils"
 )
 
 const (
@@ -34,56 +32,10 @@ type Meter struct {
 	Type MeterType
 }
 
-const (
-	MeterRead Command = iota + 1
-	HalfHData
-	EvnetLog
-	APowerLineValue
 
-)
 
-const (
-	ReqRegister USCommand = iota + 0b1010
-	ReqChangeKey
-	ReqSucACK
-	ReqFWUpgrade
-	FWUpgradeOK
-	FWUpgradeFail
-	GetMeterIDnV
-	_
-	DiagInfo
-	BrouteIDnPasswd
-	OptsACK
-	_
-	BusyACK
-	SIMInfoACK
-	_
-	NotUsed
-	ParamACK
-	MeterRTFailACK
-)
 
-const (
-	ExchangeKey DSCommand = 0b00000 + iota
-	GetDataFromMeter
-	SwitchCtrl
-	_
-	_
-	_
-	OtherCtrl
-	BRouteMeterInfo
-	RS485Ctrl
-)
-const (
-	OTAUpBootloader = 0b11011 + iota
-	OTAUpMeterFirm //0b11100
-	OTATSLHTTPSCertKeyDload // 0b11101
-	OTAUpWiFi // 0b11110
-	OTAUpCommModule // 0b11111
-)
-type Command = int
-type USCommand = int
-type DSCommand = int
+
 
 // func GetMeterData(cl *mqtt.Client, pk packets.Packet) string {
 // 	decryptPayload, err := utils.DecryptByte(pk.Payload, DefaultKey)
@@ -146,12 +98,13 @@ func GetMeterType(meterType int) {
 	}
 }
 
-func KeyExchange() []byte{
-	// getdecryptPayload
+// func KeyExchange() []byte{
+// 	// getdecryptPayload
 
-	ByteArr, _ := utils.HexStrByteArray("3bd8275ffcc0609deef1286e801fc6c45ca0f705e1e85901b2f5f7582dbed900")
-	return ByteArr
-}
+// 	ByteArr, _ := utils.HexStrByteArray("3bd8275ffcc0609deef1286e801fc6c45ca0f705e1e85901b2f5f7582dbed900")
+// 	fmt.Println(ExchangeKeyParam{ChangeNewKey: "000000J23P000078"})
+// 	return ByteArr
+// }
 
 // func MeterRegistration(meterID string, pk packets.Packet) {
 // 	prefix :=  + meterID

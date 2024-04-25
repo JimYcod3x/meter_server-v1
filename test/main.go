@@ -4,10 +4,14 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
+	"regexp"
+	"strconv"
+	"strings"
 
 	"github.com/JimYcod3x/meter_server/internal/meter"
 	"github.com/JimYcod3x/meter_server/internal/utils"
 )
+
 // 604a235000007801204a3233503030303037383030303030303030303030304a323350303030303738
 // 604a235000007801204a3233503030303037383030303030303030303030304a323350303030303738
 // [96 74 35 80 0 0 120 1 32 48 48 48 48 48 48 74 50 51 80 48 48 48 48 55 56 48 48 48 48 48 48 74 50 51 80 48 48 48 48 55 56 0 0 0 0 0 0 0]
@@ -16,7 +20,7 @@ import (
 // [96 35 80 0 0 120 1 1 32 35 53 0 48 48 48 55 56 48 49 48 48 48 48 48 48 48 48 48 48 48 48 35 53 0 48 48 48 55 56 48 49 0 0 0 0 0 0 0]
 // var payload = "604a235000007801203030303030304a3233503030303037383030303030304a32335030303030373800000000000000"
 // var payload = "029e23ef1ab96549e116e9ab34b1dec5a02f189c2bc9dec1f99bfb0bfc2c1d20b71577945228e52362057441a39b2b56"
-var payload = "c55e878e6d8c33d7a1164d1bc90be380"
+var payload = "a726439194f56bf03759f874ef4123ea"
 
 var encrypted = "347a853d458676536f0ed66a10b72afdd10206cccbb8934c8d96109e15b293cbe8f3b905aa6ba75338544ad376d792da"
 // var testmasterKey = "J23P000078000000"
@@ -86,9 +90,21 @@ func main() {
 	fmt.Println(hex.EncodeToString(decrypt))	
 	fmt.Printf("%b\n", decrypt)	
 	meterType := fmt.Sprintf(" MeteType %03b\n", decrypt[0] >> 5)	
+	meterTypeInt := int(decrypt[0] >> 5)
 	fmt.Println("print: ",meterType)	
+	switch meterTypeInt{
+	case meter.IoT: 
+		fmt.Println("this is IoT", meterTypeInt)
+	}
+
 
 	command := fmt.Sprintf(" Command %b\n", decrypt[0] & 0x1f)	
+	commandInt := int(decrypt[0] & 0x1f)
+
+	switch commandInt {
+	case meter.ReqRegister:
+		fmt.Println("this is req register", commandInt)
+	}
 	fmt.Println("print: ",command)	
 
 	meterID := fmt.Sprintf("%x", decrypt[2:8])
@@ -109,9 +125,9 @@ func main() {
 	meterTypePayload := utils.GetMeterTypeFromPayload(decrypt)
 
 	fmt.Println("get meter tyoe ", meterTypePayload)
-	meterTypeBinaryStr := utils.IntToString(meterTypePayload, meter.MeterTypeBit)
+	meterTypeBinaryStr := utils.IntToBinStr(meterTypePayload, meter.MeterTypeBit)
 	fmt.Println("binary", meterTypeBinaryStr)
-	meterCommandBinaryStr := utils.IntToString(meter.ExchangeKey, meter.MeterCommandBit)
+	meterCommandBinaryStr := utils.IntToBinStr(meter.ExchangeKey, meter.MeterCommandBit)
 	fmt.Println("command binary", meterCommandBinaryStr)
 	fmt.Println(meter.ElectricityMeter)
 	masterKey := utils.SecurityKeytoHex(utils.GetSerMasterKey(getID))
@@ -136,6 +152,27 @@ func main() {
 	test_readPayload()
 	fmt.Println("=====================================")
 	test_PreENcryptData(decrypt)
+	fmt.Println(meter.DSCommandSet.ExchangeKey["ChangeNewKey"])
+	fmt.Println(meter.DSCommandSet.OtherCtrl["ResetMeter"])
+	optionsTable, ok := meter.DSCommandSet.OtherCtrl["OptionTable"].(meter.OptionsCtrl)
+	if !ok {
+		fmt.Println("error")
+		return
+	}
+	fmt.Println(optionsTable["DailyMeterDiagnostic"])
+	fmt.Println(hex.EncodeToString([]byte("1")))
+	fmt.Println(byte(0x03))
+
+	size := "100MB"
+	re, _ := regexp.Compile("[0-9]+")
+	unit := re.ReplaceAll([]byte(size), []byte(""))
+	num, _ := strconv.ParseInt(strings.Replace(size, string(unit), "", 1), 10, 64)
+	fmt.Println("num: ", num, unit)
+
+	fmt.Println(utils.IntToHexStr(meter.ExchangeKey))
+	fmt.Println("++++++++++++++++++++++++++")
+	// meter.GetDSCommandData(meter.ExchangeKey, getID, decrypt)
+	fmt.Println(utils.HexByteToHexStr(meter.DSCommandSet.ExchangeKey["ChangeRegistrationData"]))
 
 }
 
@@ -207,8 +244,8 @@ func test_PreENcryptData(decrypt []byte) string {
 
 func getPrefix(decryptPayload []byte) string {
 	meterTypePayload := utils.GetMeterTypeFromPayload(decryptPayload)
-	meterTypeBinaryStr := utils.IntToString(meterTypePayload, meter.MeterTypeBit)
-	meterCommandBinaryStr := utils.IntToString(meter.ExchangeKey, meter.MeterCommandBit)
+	meterTypeBinaryStr := utils.IntToBinStr(meterTypePayload, meter.MeterTypeBit)
+	meterCommandBinaryStr := utils.IntToBinStr(meter.ExchangeKey, meter.MeterCommandBit)
 	 prefix, _ := utils.BinaryToHex(meterTypeBinaryStr + meterCommandBinaryStr)
 	 fmt.Println("prefix test: ", prefix)
 	return prefix

@@ -35,8 +35,16 @@ func SecurityKeytoHex(key string) (hexKey string) {
 	return
 }
 
-func IntToString(i int, numberOfBit string) string {
+func IntToBinStr(i int, numberOfBit string) string {
 	return fmt.Sprintf("%0"+numberOfBit+"b", i)
+}
+
+func IntToHexStr(i int) string {
+	return fmt.Sprintf("%02x", i)
+}
+
+func HexByteToHexStr(b byte) string {
+	return fmt.Sprintf("%02x", b)
 }
 
 func HexStrByteArray(HexS string) (byteArr []byte, err error) {
@@ -140,5 +148,4 @@ func DSTopic(pk packets.Packet) (topic string) {
 	topic = strings.Replace(pk.TopicName, "C2S", "S2C",1)
 	return 
 }
-
 

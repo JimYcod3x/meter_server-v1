@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/JimYcod3x/meter_server/internal/utils"
 	"github.com/JimYcod3x/meter_server/internal/meter"
+	"github.com/JimYcod3x/meter_server/internal/utils"
 	mqtt "github.com/mochi-mqtt/server/v2"
 	"github.com/mochi-mqtt/server/v2/packets"
-
 )
 
 const DefaultKey = "69aF7&3KY0_kk89@"
@@ -123,13 +122,9 @@ func (h *Hook) OnPublished(cl *mqtt.Client, pk packets.Packet) {
 
 	// meter.GetMeterData(cl, pk)
 	if cl.ID != "inline" {
-		publishPayload, err := utils.EncryptPadding(meter.PreEncryptData(pk), meter.DefaultKey)
-		if err != nil {
-			fmt.Println("Error encrypting payload")
-			return 
-		}
+
 		meterID := utils.GetMeterIDFromTopic(pk)
-		// // Get dataKey from server
+//  Get dataKey from server
 		dataKey := utils.GetSerDataKey(meterID)
 		payload := pk.Payload
 		// Validate if payload contains meter id
@@ -159,9 +154,18 @@ func (h *Hook) OnPublished(cl *mqtt.Client, pk packets.Packet) {
 				}
 				fmt.Println("Meter validation completed")
 				fmt.Println("Begin to Register Meter....")
-
+				// publishPayload, err := utils.EncryptPadding(
+					publishPayload := meter.DataTXFn(pk, DefaultKey)
+				// if err != nil {
+				// 	fmt.Println("Error encrypting payload")
+				// 	return 
+				// }
+				fmt.Println(publishPayload)
 				// keyexchange()
-				_  = h.config.Server.Publish(utils.DSTopic(pk), publishPayload, false, 0)
+				// _  = h.config.Server.Publish(utils.DSTopic(pk), publishPayload, false, 0)
+				// fmt.Println("keyExchange")
+				// sendoutPayload := fmt.Sprintf("%x", publishPayload)
+				// fmt.Println((sendoutPayload))
 				// main.Sev.Publish(tPub, meter.KeyExchange(), false, 2)
 	
 			}
@@ -169,7 +173,7 @@ func (h *Hook) OnPublished(cl *mqtt.Client, pk packets.Packet) {
 		}
 		fmt.Println("DownStream Topic: ", utils.DSTopic(pk))
 		_  = h.config.Server.Publish(utils.DSTopic(pk), []byte("datatransfer"), false, 0)
-		fmt.Println("prefix: ", meter.PreEncryptData(pk))
+		// fmt.Println("prefix: ", meter.ExchangeKeyFn(pk))
 	
 }
 
