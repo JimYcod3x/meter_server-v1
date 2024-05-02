@@ -11,6 +11,9 @@ import (
 	"github.com/JimYcod3x/meter_server/internal/meter"
 	"github.com/JimYcod3x/meter_server/internal/utils"
 )
+// [101010 0 1001010 100000 0 10 110011 1011111 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
+// [101010 0 1001010 100000 0 10 110011 1011111 10 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
+
 
 // 604a235000007801204a3233503030303037383030303030303030303030304a323350303030303738
 // 604a235000007801204a3233503030303037383030303030303030303030304a323350303030303738
@@ -20,12 +23,12 @@ import (
 // [96 35 80 0 0 120 1 1 32 35 53 0 48 48 48 55 56 48 49 48 48 48 48 48 48 48 48 48 48 48 48 35 53 0 48 48 48 55 56 48 49 0 0 0 0 0 0 0]
 // var payload = "604a235000007801203030303030304a3233503030303037383030303030304a32335030303030373800000000000000"
 // var payload = "029e23ef1ab96549e116e9ab34b1dec5a02f189c2bc9dec1f99bfb0bfc2c1d20b71577945228e52362057441a39b2b56"
-var payload = "a726439194f56bf03759f874ef4123ea"
+var payload = "6be092bac232896f85f072bf497b15cf"
 
 var encrypted = "347a853d458676536f0ed66a10b72afdd10206cccbb8934c8d96109e15b293cbe8f3b905aa6ba75338544ad376d792da"
-// var testmasterKey = "J23P000078000000"
+var testmasterKey = "J23P000078000000"
 // var testmasterKey = "000000J23P000078"
-var testmasterKey = "69aF7&3KY0_kk89@"
+// var testmasterKey = "69aF7&3KY0_kk89@"
 func main() {
 	
 	// encrypted, _ := utils.Encrypt("604a2350000078003030303030304a3233503030303037380000000000000000", "000000J23P000078")
@@ -88,7 +91,7 @@ func main() {
 	decrypt := test_decryptPayload()
 
 	fmt.Println(hex.EncodeToString(decrypt))	
-	fmt.Printf("%b\n", decrypt)	
+	fmt.Printf("decrypt %b\n", decrypt)	
 	meterType := fmt.Sprintf(" MeteType %03b\n", decrypt[0] >> 5)	
 	meterTypeInt := int(decrypt[0] >> 5)
 	fmt.Println("print: ",meterType)	
@@ -114,14 +117,14 @@ func main() {
 	fmt.Println("print endofF: ",)
 	firestLetter, _ := hex.DecodeString(meterID[:2])
 	println(string(firestLetter))
-	thirdLetter, _ := hex.DecodeString(meterID[4:6])
-	println(string(thirdLetter))
+	fourletter, _ := hex.DecodeString(meterID[4:6])
+	println(string(fourletter))
 
 	getID := utils.GetIdDecryptedPayload(decrypt)
 	fmt.Println("print getID: ",getID)
 
 	fmt.Printf("firestLetter %s: \n", firestLetter)
-	fmt.Printf("thirdLetter %s: \n", thirdLetter)
+	fmt.Printf("fourletter %s: \n", fourletter)
 	meterTypePayload := utils.GetMeterTypeFromPayload(decrypt)
 
 	fmt.Println("get meter tyoe ", meterTypePayload)
@@ -130,8 +133,10 @@ func main() {
 	meterCommandBinaryStr := utils.IntToBinStr(meter.ExchangeKey, meter.MeterCommandBit)
 	fmt.Println("command binary", meterCommandBinaryStr)
 	fmt.Println(meter.ElectricityMeter)
-	masterKey := utils.SecurityKeytoHex(utils.GetSerMasterKey(getID))
-	dataKey := utils.SecurityKeytoHex(utils.GetSerDataKey(getID))
+	masterKey, _ := utils.GetSerMasterKey(getID)
+	dataKey, _ := utils.GetSerDataKey(getID)
+	masterKey = utils.SecurityKeytoHex(masterKey)
+	dataKey = utils.SecurityKeytoHex(dataKey)
 	securityKey := masterKey + dataKey
 	commandParam := fmt.Sprintf("%02x", 1)
 	fmt.Println("commandParam: ", commandParam)
@@ -174,8 +179,49 @@ func main() {
 	// meter.GetDSCommandData(meter.ExchangeKey, getID, decrypt)
 	fmt.Println(utils.HexByteToHexStr(meter.DSCommandSet.ExchangeKey["ChangeRegistrationData"]))
 
+
+
+	// getCommand := utils.GetUSCommandFromDecrypt(decrypt)
+	fmt.Println(meter.USCommandSet.ReqACK["ReqChangeKey"])
+	testIDtoHexSwitch("J23P000078")
+	testIDtoHexSwitch("J200002335")
 }
 
+func testIDToHex(id string) {
+	firstletter := id[0]
+	fourletter := id[3]
+	firstlet := hex.EncodeToString([]byte{firstletter})
+	fourlet := hex.EncodeToString([]byte{fourletter})
+	if fourletter > 57 {
+		fmt.Println(true)
+		id = strings.Replace(id, string(id[:2]), firstlet, 1)
+		id = strings.Replace(id, string(id[4:6]), fourlet, 1)
+		// fmt.Println(hexstr)
+		fmt.Println("js", id)
+	}
+	// hexstr := hex.EncodeToString(fourletter)
+	// fmt.Println(fourletter)
+	// fmt.Println(hexstr)
+}
+
+func testIDtoHexSwitch(id string) {
+	hexStr := ""
+
+	for _, char := range id {
+		switch char{
+		case 'J':
+			hexStr += "4a"
+		case 'P':
+			hexStr += "50"
+		default:
+			hexStr += string(char)
+		}
+	}
+	if len(hexStr) < 12 {
+		hexStr += "f"
+	}
+	fmt.Println(hexStr)
+}
 
 func test_masterkey_encrypt() []byte{
 	encryptPayload, _ := utils.EncryptPadding(payload, testmasterKey)
@@ -193,6 +239,7 @@ func test_masterkey_decrypt(encryptedPayload string) []byte{
 
 func test_decryptPayload() []byte{
 	decryptByte, _ := hex.DecodeString(payload)
+	fmt.Println("decryptByte", decryptByte)
 	testdecrypt, _:= utils.DecryptByte(decryptByte, testmasterKey)
 	fmt.Println("test_decryptPayload", hex.EncodeToString(testdecrypt))
 	return testdecrypt
@@ -230,8 +277,10 @@ func test_PreENcryptData(decrypt []byte) string {
 	getID := utils.GetIdDecryptedPayload(decrypt)
 	fmt.Println("getID test in preencrypt: ", getID)
 	id, _ := utils.FindIdHaveF(decrypt)
-	masterKey := utils.SecurityKeytoHex(utils.GetSerMasterKey(getID))
-	dataKey := utils.SecurityKeytoHex(utils.GetSerDataKey(getID))
+	masterKey, _ := utils.GetSerMasterKey(getID)
+	dataKey, _ := utils.GetSerDataKey(getID)
+	masterKey = utils.SecurityKeytoHex(masterKey)
+	dataKey = utils.SecurityKeytoHex(dataKey)
 	securityKey := masterKey + dataKey
 	
 	commandParam := fmt.Sprintf("%02x", 1)

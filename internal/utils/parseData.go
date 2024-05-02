@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mochi-mqtt/server/v2/packets"
 )
@@ -78,10 +79,10 @@ func GetIdDecryptedPayload(dcptPayload []byte) (meterID string) {
 	}
 
 	firstLetter, _ := hex.DecodeString(idHexA[:2])
-	thirdLetter, _ := hex.DecodeString(idHexA[4:6])
+	fourletter, _ := hex.DecodeString(idHexA[4:6])
 
 	RuneArr := strings.Replace(idHexA, idHexA[:2], string(firstLetter), 1)
-	finalId = strings.Replace(RuneArr, idHexA[4:6], string(thirdLetter), 1)
+	finalId = strings.Replace(RuneArr, idHexA[4:6], string(fourletter), 1)
 
 	// fmt.Println("finalId: ", finalId)
 
@@ -101,17 +102,6 @@ func FindIdHaveF(payload []byte) (id string, haveF bool) {
 	return meterId, false
 }
 
-func GetSerDataKey(meterID string) (dataKey string) {
-	dataKey = "000000" + meterID
-	fmt.Println("SerdataKey: ", dataKey)
-	return
-}
-
-func GetSerMasterKey(meterID string) (dataKey string) {
-	dataKey =  meterID + "000000"
-	fmt.Println("SerMasterKey: ", dataKey)
-	return
-}
 
 func GetMeterIDFromTopic(pk packets.Packet) string{
 	
@@ -149,3 +139,58 @@ func DSTopic(pk packets.Packet) (topic string) {
 	return 
 }
 
+func GetUSCommandFromDecrypt(decrypt []byte) (command int) {
+	commandByte := decrypt[0] & 0x1f
+	decryptBin := fmt.Sprintf("%08b", decrypt[0])
+	commandBStr := fmt.Sprintf("%04b", commandByte >> 1)
+	commandInt, _ := strconv.ParseInt(commandBStr, 2, 64)
+	command = int(commandInt)
+	fmt.Println("new command", command, decryptBin, commandBStr)
+	fmt.Printf("command get %08b\n", (decrypt[0] & 0x1f))
+	// fmt.Printf("command get %0b\n", (decrypt[0] & 0x1f) >> 1)
+	return
+}
+
+
+func MeterIDtoHex(id string) string {
+	hexStr := ""
+
+	for _, char := range id {
+		switch char{
+		case 'J':
+			hexStr += "4a"
+		case 'P':
+			hexStr += "50"
+		default:
+			hexStr += string(char)
+		}
+	}
+	if len(hexStr) < 12 {
+		hexStr += "f"
+	}
+	fmt.Println(hexStr)
+	return hexStr
+}
+
+func ParseTimeToHexStr(timeStr any) string{
+	var unixTimeStamp int64
+	switch timeVal := timeStr.(type) {
+	case string:
+		parseTime, err := time.Parse("2006-01-02T15:04:05", timeVal)
+		if err != nil {
+			fmt.Println("Error parsing time: ", err)
+			return ""
+		}
+		unixTimeStamp = parseTime.Unix()
+
+	case int64:
+		unixTimeStamp = timeVal
+	default:
+		fmt.Println("unsupported type")
+		return ""
+	}
+
+	hexString := strconv.FormatInt(unixTimeStamp, 16)
+	fmt.Println(hexString)
+	return hexString
+}

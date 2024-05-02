@@ -13,10 +13,7 @@ const (
 	PV                                    // 110
 )
 
-const (
-	MeterTypeBit string = "3"
-	MeterCommandBit string = "5"
-)
+
 
 const (
 	DefaultKey = "69aF7&3KY0_kk89@"
@@ -113,6 +110,8 @@ func GetMeterType(meterType int) {
 // 	s.Publish(pk.TopicName, utils.PublishData(data), false, 2)
 // }
 
+func(m *Meter) HandleMeterReading() {
 
+}
 
 

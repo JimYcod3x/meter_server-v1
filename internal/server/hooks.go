@@ -72,14 +72,14 @@ func (h *Hook) OnSubscribe(cl *mqtt.Client, pk packets.Packet) packets.Packet {
 }
 
 func (h *Hook) OnPublish(cl *mqtt.Client, pk packets.Packet) (packets.Packet, error) {
-	if cl.ID != "inline" {
+	// if cl.ID != "inline" {
 	h.Log.Info(fmt.Sprintf("published payload: %v", hex.EncodeToString(pk.Payload)))
+	h.Log.Info(fmt.Sprintf("published payload: %v %v", cl.ID, len(pk.Payload)))
 
-		
-	// 
+	//
 	// _  = h.config.Server.Publish("J23P000078S2C", []byte("test"), false, 0)
 
-	}
+	// }
 
 	// if err != nil {
 	// 	go func() {
@@ -90,93 +90,123 @@ func (h *Hook) OnPublish(cl *mqtt.Client, pk packets.Packet) (packets.Packet, er
 }
 
 func (h *Hook) OnPublished(cl *mqtt.Client, pk packets.Packet) {
-
-	// datatransfer()
-	// getPayload()
-	// publish()
-
-	// Get meterID from topic
-
-	// fmt.Println("Connect Params:", pk.Connect)
-	// fmt.Println("Properties:", pk.Properties)
-	// fmt.Println("Payload:", string(pk.Payload))
-	// fmt.Println("Reason Codes:", pk.ReasonCodes)
-	// fmt.Println("Filters:", pk.Filters)
-	// fmt.Println("Topic Name:", pk.TopicName)
-	// fmt.Println("Origin:", pk.Origin)
-	// fmt.Println("Fixed Header:", pk.FixedHeader)
-	// fmt.Println("Created:", pk.Created)
-	// fmt.Println("Expiry:", pk.Expiry)
-	// fmt.Println("Mods:", pk.Mods)
-	// fmt.Println("pk ID:", pk.PacketID)
-	// fmt.Println("Protocol Version:", pk.ProtocolVersion)
-	// fmt.Println("Session Present:", pk.SessionPresent)
-	// fmt.Println("Reason Code:", pk.ReasonCode)
-	// fmt.Println("Reserved Bit:", pk.ReservedBit)
-	// fmt.Println("Ignore:", pk.Ignore)
-
-	// if !string.Contains(str, "meterID")
-	// use master key to decrypt payload
-
-	// if !string.Contains(str, "master")
-
-	// meter.GetMeterData(cl, pk)
-	if cl.ID != "inline" {
-
+	if cl.ID != "inline" && len(pk.Payload) >= 16 {
+		// if getMeterID from db else discard
+		// 	if getdatakey(getMeterID) from db else (if decrypt from default key get the request keyexchange command=> keyexchange)
+		// 		decrypt(datakey) => data transfer else decrypt(master key) get request change key command => response new datakey to meter =>
 		meterID := utils.GetMeterIDFromTopic(pk)
-//  Get dataKey from server
-		dataKey := utils.GetSerDataKey(meterID)
 		payload := pk.Payload
-		// Validate if payload contains meter id
-		isValidBySerDataKey := utils.ValidateMeter(meterID, payload, dataKey)
-		fmt.Println(isValidBySerDataKey)
-		if !isValidBySerDataKey {
-			fmt.Println("Meter ID not found in payload")
-			fmt.Println("Try the master key decrypting the payload")
-			fmt.Println("=====================================")
-			// Use master key to decrypt payload
-			masterKey := utils.GetSerMasterKey(meterID)
-			// data, err := utils.Decrypt(pk.Payload, masterKey)
-			isValidBySerMasterKey := utils.ValidateMeter(meterID, payload, masterKey)
-	
-			if !isValidBySerMasterKey {
-				fmt.Println("Meter ID not found")
-				fmt.Println("User default key to decrypt payload")
-				fmt.Println("=====================================")
-				// Use default key to decrypt payload
-				defaultKey := DefaultKey
-				isValidBySerDefalutKey := utils.ValidateMeter(meterID, payload, defaultKey)
-				if !isValidBySerDefalutKey {
-					fmt.Println("Meter ID not found")
-					fmt.Println("Meter validation failed")
-					fmt.Println("=====================================")
+		if utils.GetMeterIDFromDB(meterID) {
+			dataKey, found := utils.GetSerDataKey(meterID)
+			if !found {
+				// fmt.Println("can not find the data key in db")
+				// masterKey, found := utils.GetSerMasterKey(meterID)
+				// if !found {
+				fmt.Println("can not find the masterkey in db")
+				valid := utils.ValidateMeter(meterID, payload, DefaultKey)
+				if valid {
+					decryptByteDF, _ := utils.DecryptByte(payload, DefaultKey)
+					command := utils.GetUSCommandFromDecrypt(decryptByteDF)
+					commandParam := decryptByteDF[8]
+					fmt.Printf("command df: %04b\n", command)
+					if command == meter.ReqACK && commandParam == meter.USCommandSet.ReqACK["ReqRegistration"] {
+						publishPayload := meter.KeyXFn(pk, DefaultKey, "ReqRegistration")
+						publishPayloadByte, err := utils.EncryptPadding(publishPayload, DefaultKey)
+						if err != nil {
+							h.Log.Info("can not encrypt the payload")
+						}
+						fmt.Println("DownStream Topic DF: ", utils.DSTopic(pk))
+						h.config.Server.Publish(utils.DSTopic(pk), publishPayloadByte, false, 0)
+						return
+					}
+				}
+				return
+				// }
+				// valid := utils.ValidateMeter(meterID, payload, masterKey)
+				// if valid {
+				// 	fmt.Println("master key decrypt & get the request change key command")
+				// 	decryptByteMK, _ := utils.DecryptByte(payload, masterKey)
+				// 	command := utils.GetUSCommandFromDecrypt(decryptByteMK)
+				// 	fmt.Printf("command mk: %04b\n", command)
+				// 	commandParam := decryptByteMK[8]
+				// 	fmt.Println("commandParam: ", commandParam)
+				// 	if command == meter.ReqACK && commandParam == meter.USCommandSet.ExchangeKey["ReqChangeKey"] {
+				// 		publishPayload := meter.KeyXFn(pk, masterKey, "ReqChangeKey")
+				// 		fmt.Println("preencrypt: ", publishPayload)
+				// 		publishPayloadByte, err := utils.EncryptPadding(publishPayload, masterKey)
+				// 		if err != nil {
+				// 			log.Fatal("can not encrypt the payload")
+				// 		}
+				// 		fmt.Println("DownStream Topic MK: ", utils.DSTopic(pk))
+				// 		h.config.Server.Publish(utils.DSTopic(pk), publishPayloadByte, false, 0)
+				// 		return
+				// 	}
+				// }
+				// dataKey = "000000" + meterID
+				// valid = utils.ValidateMeter(meterID, payload, dataKey)
+				// fmt.Println("meterID: ", meterID)
+				// if valid {
+				// 	fmt.Println("valid")
+				// 	decryptByteDK, _ := utils.DecryptByte(payload, dataKey)
+				// 	command := utils.GetUSCommandFromDecrypt(decryptByteDK)
+				// 	fmt.Printf("command mk: %04b\n", command)
+				// 	commandParam := decryptByteDK[8]
+				// 	if command == meter.ReqACK && commandParam == meter.USCommandSet.ExchangeKey["ReqSucACK"] {
+				// 		publishPayload := meter.KeyXFn(pk, dataKey, "ReqSucACK")
+				// 		fmt.Println("preencrypt: ", publishPayload)
+				// 		publishPayloadByte, err := utils.EncryptPadding(publishPayload, dataKey)
+				// 		if err != nil {
+				// 			log.Fatal("can not encrypt the payload")
+				// 		}
+				// 		h.config.Server.Publish(utils.DSTopic(pk), publishPayloadByte, false, 0)
+				// 		return
+				// 	}
+				// 	return
+				// }
+
+			}
+			valid := utils.ValidateMeter(meterID, payload, dataKey)
+			fmt.Println("meterID: ", meterID)
+			if valid {
+				fmt.Println("valid")
+				decryptByteDK, _ := utils.DecryptByte(payload, dataKey)
+				command := utils.GetUSCommandFromDecrypt(decryptByteDK)
+				fmt.Printf("command mk: %04b\n", command)
+				commandParam := decryptByteDK[8]
+				if command == meter.ReqACK && commandParam == meter.USCommandSet.ReqACK["ReqSucACK"] {
+					publishPayload := meter.KeyXFn(pk, dataKey, "ReqSucACK")
+					publishPayloadByte, err := utils.EncryptPadding(publishPayload, dataKey)
+					if err != nil {
+						h.Log.Info("can not encrypt the payload")
+					}
+					h.config.Server.Publish(utils.DSTopic(pk), publishPayloadByte, false, 0)
 					return
 				}
-				fmt.Println("Meter validation completed")
-				fmt.Println("Begin to Register Meter....")
-				// publishPayload, err := utils.EncryptPadding(
-					publishPayload := meter.DataTXFn(pk, DefaultKey)
-				// if err != nil {
-				// 	fmt.Println("Error encrypting payload")
-				// 	return 
-				// }
-				fmt.Println(publishPayload)
-				// keyexchange()
-				// _  = h.config.Server.Publish(utils.DSTopic(pk), publishPayload, false, 0)
-				// fmt.Println("keyExchange")
-				// sendoutPayload := fmt.Sprintf("%x", publishPayload)
-				// fmt.Println((sendoutPayload))
-				// main.Sev.Publish(tPub, meter.KeyExchange(), false, 2)
-	
-			}
-	
-		}
-		fmt.Println("DownStream Topic: ", utils.DSTopic(pk))
-		_  = h.config.Server.Publish(utils.DSTopic(pk), []byte("datatransfer"), false, 0)
-		// fmt.Println("prefix: ", meter.ExchangeKeyFn(pk))
-	
-}
 
+			}
+			masterKey, _ := utils.GetSerMasterKey(meterID)
+			valid = utils.ValidateMeter(meterID, payload, masterKey)
+			if valid {
+				fmt.Println("master key decrypt & get the request change key command")
+				decryptByteMK, _ := utils.DecryptByte(payload, masterKey)
+				command := utils.GetUSCommandFromDecrypt(decryptByteMK)
+				fmt.Printf("command mk: %04b\n", command)
+				commandParam := decryptByteMK[8]
+				fmt.Println("commandParam: ", commandParam)
+				if command == meter.ReqACK && commandParam == meter.USCommandSet.ReqACK["ReqChangeKey"] {
+					publishPayload := meter.KeyXFn(pk, masterKey, "ReqChangeKey")
+					fmt.Println("preencrypt: ", publishPayload)
+					publishPayloadByte, err := utils.EncryptPadding(publishPayload, masterKey)
+					if err != nil {
+						h.Log.Info("can not encrypt the payload")
+					}
+					fmt.Println("DownStream Topic MK: ", utils.DSTopic(pk))
+					h.config.Server.Publish(utils.DSTopic(pk), publishPayloadByte, false, 0)
+					return
+				}
+			}
+		}
+	}
 }
 
 // OnConnectAuthenticate method
