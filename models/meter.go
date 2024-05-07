@@ -3,7 +3,7 @@ package models
 import "gorm.io/gorm"
 
 type Meter struct {
-	ID string `gorm:"primaryKey"`
+	ID int `gorm:"primaryKey"`
 	MeterID string `gorm:"type:varchar(50);unique" json:"meterId"`
 	MeterType string `gorm:"type:varchar(50);not null" json:"meterType"`
 	MasterKey string `gorm:"type:varchar(50)"`
