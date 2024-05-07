@@ -36,6 +36,8 @@ func Run(options *mqtt.Options) *mqtt.Server {
 	rdb := database.ConnectionRedisDb(&loadConfig)
 
 	utils.CreateMeter(db, "J23P000078", "IoT")
+	utils.CreateMeter(db, "J230008542", "PV")
+	utils.CreateMeter(db, "J200002335", "PV")
 
 
 	// var ctx = context.Background()
