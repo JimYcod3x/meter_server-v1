@@ -1,9 +1,17 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"time"
+
+	"github.com/JimYcod3x/meter_server/models"
+	"github.com/go-redis/redis/v8"
+	"gorm.io/gorm"
 )
+
+var meters models.Meter
 
 func GetSerDataKey(meterID string) (dataKey string, found bool) {
 	dataKey, err := FindDateKey(meterID)
@@ -42,5 +50,25 @@ func FindMasterKey(meterID string) (masterKey string, err error) {
 	return 
 }
 
+func CreateMeter(db *gorm.DB, meterID string, meterType string) error {
+	fmt.Println("create the meter")
+err := db.FirstOrCreate(&meters, models.Meter{
+	MeterID: meterID,
+	MeterType: meterType,
+}).Error
+
+	if err != nil {
+		fmt.Println("Error creating the meter", err)
+	}
+	return err
+}
+
+func SaveToRdb(rdb *redis.Client, ctx context.Context, meterID string, key string) error {
+	err := rdb.Set(ctx, "mk_" + meterID, key, 24 * time.Hour).Err()
+	if err != nil {
+		fmt.Println("can not save to rdb", err)
+	}
+	return err
+}
 
 

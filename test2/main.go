@@ -13,16 +13,22 @@ import (
 var needEncrypt = "604a235000007802"
 
 // var testmasterKey = "J23P000078000000"
-var testmasterKey = "000000J23P000078"
+var testmasterKey = "000000J230008542"
+// var testmasterKey = "000000J23P000078"
 
 // var testmasterKey = "69aF7&3KY0_kk89@"
 func main() {
-	payload := "6ce29febb8b019d41c201effbcd3c196d53dfe9409bd53f3a44815880488c4d7"
+	payload := "4ac487b681a62ef7fdf1cab3e6fa038d"
 	fmt.Println(testdecrypt(payload))
 	fmt.Println(testEncrypt(needEncrypt))
 	testSwitchCase("GetInstantReading")
 	testParseTime("2024-05-02T00:00:02")
-	testParseTime(time.Now().Unix())
+	fmt.Println(hex.EncodeToString(testFn2()))
+	testinter("J200002335")
+	c := time.Tick(5 * time.Second)
+	for next := range c {
+		fmt.Printf("%v, %v\n", next, statusUpdate())
+	}
 }
 
 func testdecrypt(payload string) string {
@@ -67,3 +73,21 @@ func testParseTime(timeStr any) string {
 	fmt.Println(hexString)
 	return hexString
 }
+
+func testFn2() []byte {
+	meterType := meter.ElectricityMeter
+	meterDSCmd := meter.GetDataFromMeter
+	meterID := "J230008542"
+	// meterID := "J23P000078"
+	dsCmdParam := "Get30minRecordLog"
+	startTime := "2024-05-02T15:15:00"
+	endTime := "2024-05-02T15:15:01"
+	return meter.CallGetDataFromMeter(meterType, meterDSCmd, meterID, dsCmdParam, startTime, endTime)
+}
+
+func testinter(id string) {
+	a := utils.MeterIDtoHex(id)
+	fmt.Println(a)
+}
+
+func statusUpdate() string {return "updated"}

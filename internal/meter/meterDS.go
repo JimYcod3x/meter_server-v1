@@ -42,7 +42,7 @@ func  CallGetDataFromMeter(meterType, meterDSCmd int, meterID string, dsCmdParam
 	fmt.Println("preEncrypt payload in testmeterfn", preEncry)
 	fmt.Println("preEncrypt payload in testmeterfn", preEncyhexStr)
 	sentouPayload, _ := utils.EncryptPadding(preEncry, dataKey)
-	return sentouPayload
+	return sentouPayload                                       
 }
 
 

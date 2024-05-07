@@ -194,3 +194,8 @@ func ParseTimeToHexStr(timeStr any) string{
 	fmt.Println(hexString)
 	return hexString
 }
+
+// J23P000078
+
+
+// 4a2300008542

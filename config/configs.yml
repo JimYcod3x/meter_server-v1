@@ -11,7 +11,7 @@ listeners:
 hooks:
   debug:
     enable: true
-  # storage:
+  storage:
   #   badger:
   #     path: badger.db
   #     gc_interval: 3

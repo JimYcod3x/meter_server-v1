@@ -3,9 +3,13 @@ package server
 import (
 	"encoding/hex"
 	"fmt"
+	"log"
 	"time"
 
+	"github.com/JimYcod3x/meter_server/config"
+	"github.com/JimYcod3x/meter_server/database"
 	"github.com/JimYcod3x/meter_server/internal/meter"
+	"github.com/JimYcod3x/meter_server/internal/utils"
 	mqtt "github.com/mochi-mqtt/server/v2"
 	"github.com/mochi-mqtt/server/v2/packets"
 )
@@ -22,12 +26,28 @@ type Server struct {
 }
 
 func Run(options *mqtt.Options) *mqtt.Server {
+	loadConfig, err := config.LoadConfig(".")
+	if err != nil {
+		log.Fatal("cannot load environment variables", err)
+	}
+
+	db := database.ConnectionDB(&loadConfig)
+
+	rdb := database.ConnectionRedisDb(&loadConfig)
+
+	utils.CreateMeter(db, "J23P000078", "IoT")
+
+
+	// var ctx = context.Background()
+	// utils.SaveToRdb(rdb, ctx, "J23P000078","J23P000078"+ "000000")
+
 
 	sev := mqtt.New(options)
 	sev.AddHook(new(Hook), &HookOptions{
 		Server: sev,
+		db: db,
+		rdb: rdb,
 	})
-
 	// client := sev.NewClient(nil, mqtt.LocalListener, mqtt.InlineClientId, true)
 	// sev.Clients.Add(client)
 	// TODO: only subscribe the meterid in db

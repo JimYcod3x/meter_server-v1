@@ -1,17 +1,25 @@
 package server
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/JimYcod3x/meter_server/internal/meter"
 	"github.com/JimYcod3x/meter_server/internal/utils"
+	"github.com/JimYcod3x/meter_server/models"
+	"github.com/go-redis/redis/v8"
 	mqtt "github.com/mochi-mqtt/server/v2"
 	"github.com/mochi-mqtt/server/v2/packets"
+	"gorm.io/gorm"
 )
 
 const DefaultKey = "69aF7&3KY0_kk89@"
+
+var ctx = context.Background()
+var Meters models.Meter
 
 type Hook struct {
 	mqtt.HookBase
@@ -20,6 +28,8 @@ type Hook struct {
 
 type HookOptions struct {
 	Server *mqtt.Server
+	db     *gorm.DB
+	rdb    *redis.Client
 }
 
 func (h *Hook) Init(config any) error {
@@ -32,6 +42,9 @@ func (h *Hook) Init(config any) error {
 	if h.config.Server == nil {
 		return mqtt.ErrInvalidConfigType
 	}
+	// if h.config.db == nil {
+	// 	return mqtt.ErrInvalidConfigType
+	// }
 	return nil
 }
 
@@ -55,7 +68,9 @@ func (h *Hook) OnPacketRead(cl *mqtt.Client, pk packets.Packet) (pkx packets.Pac
 
 func (h *Hook) OnStarted() {
 	log.Println("server started")
-
+	// h.config.rdb.Set(ctx,"test",241, 0)
+	// result, _ := h.config.rdb.Get(ctx, "test").Result()
+	// fmt.Println("result", result)
 }
 
 func (h *Hook) OnConnect(cl *mqtt.Client, pk packets.Packet) error {
@@ -92,120 +107,198 @@ func (h *Hook) OnPublish(cl *mqtt.Client, pk packets.Packet) (packets.Packet, er
 func (h *Hook) OnPublished(cl *mqtt.Client, pk packets.Packet) {
 	if cl.ID != "inline" && len(pk.Payload) >= 16 {
 		// if getMeterID from db else discard
+
 		// 	if getdatakey(getMeterID) from db else (if decrypt from default key get the request keyexchange command=> keyexchange)
 		// 		decrypt(datakey) => data transfer else decrypt(master key) get request change key command => response new datakey to meter =>
 		meterID := utils.GetMeterIDFromTopic(pk)
+		fmt.Println("get id from topic", meterID)
 		payload := pk.Payload
-		if utils.GetMeterIDFromDB(meterID) {
-			dataKey, found := utils.GetSerDataKey(meterID)
-			if !found {
-				// fmt.Println("can not find the data key in db")
-				// masterKey, found := utils.GetSerMasterKey(meterID)
-				// if !found {
-				fmt.Println("can not find the masterkey in db")
-				valid := utils.ValidateMeter(meterID, payload, DefaultKey)
+		fmt.Println("what is the meters is", Meters)
+		meterExis, _ := h.config.rdb.Get(ctx, "*"+meterID).Result()
+		if len(meterExis) == 0 {
+			fmt.Println("meter not found in rdb")
+			err := h.config.db.Where("meter_id = ?", meterID).First(&Meters).Error
+			fmt.Println("meter result", Meters.MeterID)
+			if Meters.MeterID != meterID || err != nil {
+				fmt.Println("Meter can not found in db, discard")
+				return
+			}
+		}
+		// get datakey from db
+		dataKey, _ := h.config.rdb.Get(ctx, "dk_"+meterID).Result()
+		if len(dataKey) == 0 {
+			fmt.Println("datakey can not found in rdb")
+			err := h.config.db.Where("meter_id = ?", meterID).First(&Meters.DataKey).Error
+			if err != nil {
+				fmt.Println("data key can not found in db")
+				// get master key from db
+				masterKey, _ := h.config.rdb.Get(ctx, "mk_"+meterID).Result()
+				if len(masterKey) == 0 {
+					fmt.Println("master key can not found in rdb")
+					err := h.config.db.Where("meter_id = ?", meterID).First(&Meters.MasterKey).Error
+					if err != nil {
+						fmt.Println("master key can not found in db")
+						// use default key to decrypt
+						fmt.Println("can not find the masterkey in rdb")
+
+						valid := utils.ValidateMeter(meterID, payload, DefaultKey)
+						fmt.Println("testvvalid", valid)
+						if valid {
+							decryptByteDF, _ := utils.DecryptByte(payload, DefaultKey)
+							command := utils.GetUSCommandFromDecrypt(decryptByteDF)
+							commandParam := decryptByteDF[8]
+							fmt.Printf("command df: %04b\n", command)
+							fmt.Println(command == meter.ReqACK)
+							fmt.Println(meter.ReqACK)
+							fmt.Println(int(commandParam) == (meter.USCommandSet.ReqACK["ReqRegistration"]).(int))
+							fmt.Println(meter.USCommandSet.ReqACK["ReqRegistration"])
+							fmt.Println(command == meter.ReqACK && int(commandParam) == (meter.USCommandSet.ReqACK["ReqRegistration"]).(int))
+							if command == meter.ReqACK && int(commandParam) == (meter.USCommandSet.ReqACK["ReqRegistration"]).(int) {
+								fmt.Println("ReqRegistration")
+								publishPayload := meter.KeyXFn(pk, DefaultKey, "ReqRegistration")
+								publishPayloadByte, err := utils.EncryptPadding(publishPayload, DefaultKey)
+								if err != nil {
+									h.Log.Info("can not encrypt the payload")
+									return
+								}
+								fmt.Println("DownStream Topic DF: ", utils.DSTopic(pk))
+								h.config.Server.Publish(utils.DSTopic(pk), publishPayloadByte, false, 0)
+								return
+							}
+							materKey := meterID + "000000"
+							if command == meter.ReqACK && int(commandParam) == (meter.USCommandSet.ReqACK["ReqSucACK"]).(int) {
+								fmt.Println("req ack")
+								err := h.config.rdb.Set(ctx, "mk_"+meterID, materKey, 24*time.Hour).Err()
+								if err != nil {
+									fmt.Println("can not save to rdb")
+									return
+								}
+								err = h.config.db.Model(&models.Meter{}).Where("meter_id = ?", meterID).Update("master_key", materKey).Error
+								if err != nil {
+									fmt.Println("can not save mk to db")
+									return
+								}
+								err = h.config.rdb.Set(ctx, "mk_"+meterID, materKey, 24*time.Hour).Err()
+								if err != nil {
+									fmt.Println("can not save to rdb")
+									return
+								}
+								fmt.Println("save to db")
+							}
+							return
+						}
+						fmt.Println("can not decrypt from the dk discard...")
+						return
+					}
+				}
+				// decrypt the payload (masterKey)
+				fmt.Println("masterkey", masterKey)
+				// masterKey := keys
+				fmt.Println("jsadkflja", masterKey)
+				valid := utils.ValidateMeter(meterID, payload, masterKey)
 				if valid {
-					decryptByteDF, _ := utils.DecryptByte(payload, DefaultKey)
-					command := utils.GetUSCommandFromDecrypt(decryptByteDF)
-					commandParam := decryptByteDF[8]
-					fmt.Printf("command df: %04b\n", command)
-					if command == meter.ReqACK && commandParam == meter.USCommandSet.ReqACK["ReqRegistration"] {
-						publishPayload := meter.KeyXFn(pk, DefaultKey, "ReqRegistration")
-						publishPayloadByte, err := utils.EncryptPadding(publishPayload, DefaultKey)
+					fmt.Println("master key decrypt & get the request change key command")
+					decryptByteMK, _ := utils.DecryptByte(payload, masterKey)
+					command := utils.GetUSCommandFromDecrypt(decryptByteMK)
+					fmt.Printf("command mk: %04b\n", command)
+					commandParam := decryptByteMK[8]
+					fmt.Println("commandParam: ", commandParam)
+					if command == meter.ReqACK && int(commandParam) == (meter.USCommandSet.ReqACK["ReqChangeKey"]).(int) {
+						publishPayload := meter.KeyXFn(pk, masterKey, "ReqChangeKey")
+						fmt.Println("preencrypt: ", publishPayload)
+						publishPayloadByte, err := utils.EncryptPadding(publishPayload, masterKey)
 						if err != nil {
 							h.Log.Info("can not encrypt the payload")
 						}
-						fmt.Println("DownStream Topic DF: ", utils.DSTopic(pk))
+						fmt.Println("DownStream Topic MK: ", utils.DSTopic(pk))
 						h.config.Server.Publish(utils.DSTopic(pk), publishPayloadByte, false, 0)
 						return
 					}
 				}
-				return
-				// }
-				// valid := utils.ValidateMeter(meterID, payload, masterKey)
-				// if valid {
-				// 	fmt.Println("master key decrypt & get the request change key command")
-				// 	decryptByteMK, _ := utils.DecryptByte(payload, masterKey)
-				// 	command := utils.GetUSCommandFromDecrypt(decryptByteMK)
-				// 	fmt.Printf("command mk: %04b\n", command)
-				// 	commandParam := decryptByteMK[8]
-				// 	fmt.Println("commandParam: ", commandParam)
-				// 	if command == meter.ReqACK && commandParam == meter.USCommandSet.ExchangeKey["ReqChangeKey"] {
-				// 		publishPayload := meter.KeyXFn(pk, masterKey, "ReqChangeKey")
-				// 		fmt.Println("preencrypt: ", publishPayload)
-				// 		publishPayloadByte, err := utils.EncryptPadding(publishPayload, masterKey)
-				// 		if err != nil {
-				// 			log.Fatal("can not encrypt the payload")
-				// 		}
-				// 		fmt.Println("DownStream Topic MK: ", utils.DSTopic(pk))
-				// 		h.config.Server.Publish(utils.DSTopic(pk), publishPayloadByte, false, 0)
-				// 		return
-				// 	}
-				// }
-				// dataKey = "000000" + meterID
-				// valid = utils.ValidateMeter(meterID, payload, dataKey)
-				// fmt.Println("meterID: ", meterID)
-				// if valid {
-				// 	fmt.Println("valid")
-				// 	decryptByteDK, _ := utils.DecryptByte(payload, dataKey)
-				// 	command := utils.GetUSCommandFromDecrypt(decryptByteDK)
-				// 	fmt.Printf("command mk: %04b\n", command)
-				// 	commandParam := decryptByteDK[8]
-				// 	if command == meter.ReqACK && commandParam == meter.USCommandSet.ExchangeKey["ReqSucACK"] {
-				// 		publishPayload := meter.KeyXFn(pk, dataKey, "ReqSucACK")
-				// 		fmt.Println("preencrypt: ", publishPayload)
-				// 		publishPayloadByte, err := utils.EncryptPadding(publishPayload, dataKey)
-				// 		if err != nil {
-				// 			log.Fatal("can not encrypt the payload")
-				// 		}
-				// 		h.config.Server.Publish(utils.DSTopic(pk), publishPayloadByte, false, 0)
-				// 		return
-				// 	}
-				// 	return
-				// }
-
-			}
-			valid := utils.ValidateMeter(meterID, payload, dataKey)
-			fmt.Println("meterID: ", meterID)
-			if valid {
-				fmt.Println("valid")
-				decryptByteDK, _ := utils.DecryptByte(payload, dataKey)
-				command := utils.GetUSCommandFromDecrypt(decryptByteDK)
-				fmt.Printf("command mk: %04b\n", command)
-				commandParam := decryptByteDK[8]
-				if command == meter.ReqACK && commandParam == meter.USCommandSet.ReqACK["ReqSucACK"] {
-					publishPayload := meter.KeyXFn(pk, dataKey, "ReqSucACK")
-					publishPayloadByte, err := utils.EncryptPadding(publishPayload, dataKey)
-					if err != nil {
-						h.Log.Info("can not encrypt the payload")
-					}
-					h.config.Server.Publish(utils.DSTopic(pk), publishPayloadByte, false, 0)
-					return
-				}
-
-			}
-			masterKey, _ := utils.GetSerMasterKey(meterID)
-			valid = utils.ValidateMeter(meterID, payload, masterKey)
-			if valid {
-				fmt.Println("master key decrypt & get the request change key command")
-				decryptByteMK, _ := utils.DecryptByte(payload, masterKey)
-				command := utils.GetUSCommandFromDecrypt(decryptByteMK)
-				fmt.Printf("command mk: %04b\n", command)
-				commandParam := decryptByteMK[8]
-				fmt.Println("commandParam: ", commandParam)
-				if command == meter.ReqACK && commandParam == meter.USCommandSet.ReqACK["ReqChangeKey"] {
-					publishPayload := meter.KeyXFn(pk, masterKey, "ReqChangeKey")
-					fmt.Println("preencrypt: ", publishPayload)
-					publishPayloadByte, err := utils.EncryptPadding(publishPayload, masterKey)
-					if err != nil {
-						h.Log.Info("can not encrypt the payload")
-					}
-					fmt.Println("DownStream Topic MK: ", utils.DSTopic(pk))
-					h.config.Server.Publish(utils.DSTopic(pk), publishPayloadByte, false, 0)
-					return
-				}
 			}
 		}
+		// dataKey := keys
+		// decrypt the payload(dataKey)
+		dataKey, _ = utils.FindDateKey(meterID)
+		fmt.Println("jsadkflja", dataKey)
+		valid := utils.ValidateMeter(meterID, payload, dataKey)
+		fmt.Println("meterID: ", meterID)
+		if valid {
+			fmt.Println("valid")
+			decryptByteDK, _ := utils.DecryptByte(payload, dataKey)
+			command := utils.GetUSCommandFromDecrypt(decryptByteDK)
+			fmt.Printf("command mk: %04b\n", command)
+			commandParam := decryptByteDK[8]
+			if command == meter.ReqACK && int(commandParam) == (meter.USCommandSet.ReqACK["ReqSucACK"]).(int) {
+				err := h.config.db.Model(&models.Meter{}).Where("meter_id = ?", meterID).Update("data_key", dataKey).Error
+				
+				if err != nil {
+					fmt.Println("can not save dk to db", err)
+					return
+				}
+				err = h.config.rdb.Set(ctx, "dk_"+meterID, dataKey, 24*time.Hour).Err()
+				if err != nil {
+					fmt.Println("can not save to rdb")
+					return
+				}
+				fmt.Println("save to db")
+				publishPayload := meter.KeyXFn(pk, dataKey, "ReqSucACK")
+				publishPayloadByte, err := utils.EncryptPadding(publishPayload, dataKey)
+				if err != nil {
+					h.Log.Info("can not encrypt the payload")
+				}
+				h.config.Server.Publish(utils.DSTopic(pk), publishPayloadByte, false, 0)
+				return
+			}
+		}
+		masterKey, _ := h.config.rdb.Get(ctx, "mk_"+meterID).Result()
+		if len(masterKey) == 0 {
+			fmt.Println("can not get the master key in rdb")
+			return
+		}
+		// masterKey := keys
+		fmt.Println("jsadkflja11", masterKey)
+		valid = utils.ValidateMeter(meterID, payload, masterKey)
+		if valid {
+			fmt.Println("master key decrypt & get the request change key command")
+			decryptByteMK, _ := utils.DecryptByte(payload, masterKey)
+			command := utils.GetUSCommandFromDecrypt(decryptByteMK)
+			fmt.Printf("command mk: %04b\n", command)
+			commandParam := decryptByteMK[8]
+			fmt.Println("commandParam: ", commandParam)
+			if command == meter.ReqACK && commandParam == meter.USCommandSet.ReqACK["ReqChangeKey"] {
+				publishPayload := meter.KeyXFn(pk, masterKey, "ReqChangeKey")
+				fmt.Println("preencrypt: ", publishPayload)
+				publishPayloadByte, err := utils.EncryptPadding(publishPayload, masterKey)
+				if err != nil {
+					h.Log.Info("can not encrypt the payload")
+				}
+				fmt.Println("DownStream Topic MK: ", utils.DSTopic(pk))
+				h.config.Server.Publish(utils.DSTopic(pk), publishPayloadByte, false, 0)
+				return
+			}
+		}
+
+		// _, err := h.config.rdb.Get(ctx, meterID).Result()
+		// 111111
+		// if err == nil {
+		// 	// if utils.GetMeterIDFromDB(meterID) {
+		// 	// dataKey, found := utils.GetSerDataKey(meterID)
+		// 	dataKey, err := h.config.rdb.Get(ctx, "dk_"+meterID).Result()
+		// 	if err == nil && err == redis.Nil {
+		// 		err = h.config.db.Model(models.Meter{}).Select("data_key").Where("meter_id=?", meterID).Find(&meters).Error
+		// 		if err != nil {
+
+		// 		}
+		// 		// fmt.Println("can not find the data key in db")
+		// 		// masterKey, found := utils.GetSerMasterKey(meterID)
+		// 		// if !found {
+
+		// 	}
+
+		// 	masterKey, _ := utils.GetSerMasterKey(meterID)
+
+		// }
 	}
 }
 

@@ -71,18 +71,19 @@ func Decrypt(plaintext []byte, DefaultKey string) (string, error) {
 }
 
 func DecryptByte(plaintext []byte, DefaultKey string) ([]byte, error) {
+	fmt.Println("420plaintext", DefaultKey)
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println("recovered from panic in Decrypt")
+			fmt.Println("recovered from panic in Decrypt",r)
 		}
 	}()
 	bDK := []byte(DefaultKey)
 	bIV := []byte("420#abA%,ZfE79@M")
-	// fmt.Printf("pltxt: %", string(plaintext))
 	bPlaintext := []byte(plaintext)
 	block, _ := aes.NewCipher(bDK)
 	ciphertext := make([]byte, len(bPlaintext))
 	mode := cipher.NewCBCDecrypter(block, bIV)
+	fmt.Printf("pltxt123: %s\n", string(plaintext))
 	mode.CryptBlocks(ciphertext, bPlaintext)
 	return ciphertext, nil
 }
