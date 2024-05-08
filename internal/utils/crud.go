@@ -35,40 +35,43 @@ func GetSerMasterKey(meterID string) (masterKey string, found bool) {
 
 func GetMeterIDFromDB(meterID string) bool {
 	var fromDBMeterID = meterID
-	return  fromDBMeterID == meterID 
+	return fromDBMeterID == meterID
 }
 
 func FindDateKey(meterID string) (dataKey string, err error) {
 	dataKey = "000000" + meterID
 	fmt.Println("db data key: ", dataKey)
-	return 
+	return
 }
 
 func FindMasterKey(meterID string) (masterKey string, err error) {
-	masterKey =  meterID + "000000"
+	masterKey = meterID + "000000"
 	fmt.Println("db master Key: ", masterKey)
-	return 
+	return
 }
 
 func CreateMeter(db *gorm.DB, meterID string, meterType string) error {
 	fmt.Println("create the meter")
-err := db.FirstOrCreate(&meters, models.Meter{
-	MeterID: meterID,
-	MeterType: meterType,
-}).Error
-
-	if err != nil {
-		fmt.Println("Error creating the meter", err)
+	meters := models.Meter{
+		MeterID:   meterID,
+		MeterType: meterType,
 	}
-	return err
+	err := db.Where("meter_id = ?", meterID).First(&meters).Error
+	if err != nil {
+		fmt.Println(err)
+		return db.Model(models.Meter{}).Create(&meters).Error
+	}
+	fmt.Println(meters)
+	// if err := db.First(&models.User{Email: payload.Email}).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+
+	// }
+	return nil
 }
 
 func SaveToRdb(rdb *redis.Client, ctx context.Context, meterID string, key string) error {
-	err := rdb.Set(ctx, "mk_" + meterID, key, 24 * time.Hour).Err()
+	err := rdb.Set(ctx, "mk_"+meterID, key, 24*time.Hour).Err()
 	if err != nil {
 		fmt.Println("can not save to rdb", err)
 	}
 	return err
 }
-
-
