@@ -56,7 +56,7 @@ func CreateMeter(db *gorm.DB, meterID string, meterType string) error {
 		MeterID:   meterID,
 		MeterType: meterType,
 	}
-	err := db.Where("meter_id = ?", meterID).First(&meters).Error
+	err := db.First(&meters, "meter_id = ?", meterID).Error
 	if err != nil {
 		fmt.Println(err)
 		return db.Model(models.Meter{}).Create(&meters).Error
