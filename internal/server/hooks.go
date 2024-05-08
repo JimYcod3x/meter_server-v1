@@ -117,7 +117,7 @@ func (h *Hook) OnPublished(cl *mqtt.Client, pk packets.Packet) {
 		meterExis, _ := h.config.rdb.Get(ctx, "*"+meterID).Result()
 		if len(meterExis) == 0 {
 			fmt.Println("meter not found in rdb")
-			err := h.config.db.Where("meter_id = ?", meterID).First(&Meters.MeterID).Error
+			err := h.config.db.Where("meter_id = ?", meterID).First(&Meters).Error
 			fmt.Println("meter result", Meters.MeterID)
 			if Meters.MeterID != meterID || err != nil {
 				fmt.Println("Meter can not found in db, discard")
