@@ -90,8 +90,8 @@ func pubFn() []byte {
 func pubFn2() []byte {
 	meterType := meter.IoT
 	meterDSCmd := meter.GetDataFromMeter
-	// meterID := "J200002335"
-	meterID := "J23P000078"
+	meterID := "J200002335"
+	// meterID := "J23P000078"
 	dsCmdParam := "Get30minRecordLog"
 	startTime := "2024-05-02T15:15:00"
 	endTime := "2024-05-02T15:15:01"
