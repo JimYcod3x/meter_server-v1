@@ -130,7 +130,7 @@ func (h *Hook) OnPublished(cl *mqtt.Client, pk packets.Packet) {
 			// err := h.config.db.First(&Meters, "meter_id = ?", meterID).Error
 			res, _ := dot.QueryRow(db, "find-one-meter-by-meter_id", meterID)
 			err = res.Scan(&Meters.MeterID)
-			if err != sql.ErrNoRows {
+			if err == sql.ErrNoRows {
 				fmt.Println("can not get the record from db")
 				return
 			}
@@ -146,7 +146,7 @@ func (h *Hook) OnPublished(cl *mqtt.Client, pk packets.Packet) {
 			fmt.Println("datakey can not found in rdb")
 		res, _ := dot.QueryRow(db, "find-one-meter-dk-by-meter_id", meterID)
 			err = res.Scan(&Meters.MeterID)
-			if err != sql.ErrNoRows {
+			if err == sql.ErrNoRows {
 				fmt.Println("data key can not found in db")
 				// get master key from db
 				masterKey, _ := h.config.rdb.Get(ctx, "mk_"+meterID).Result()
@@ -154,7 +154,7 @@ func (h *Hook) OnPublished(cl *mqtt.Client, pk packets.Packet) {
 					fmt.Println("master key can not found in rdb")
 					res, _ := dot.QueryRow(db, "find-one-meter-mk-by-meter_id", meterID)
 					err = res.Scan(&Meters.MeterID)
-					if err != sql.ErrNoRows {
+					if err == sql.ErrNoRows {
 						fmt.Println("master key can not found in db")
 						// use default key to decrypt
 
