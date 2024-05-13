@@ -36,8 +36,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	sev := server.Run(options)
+	sev, db := server.Run(options)
 	fmt.Println("server started: ", sev)
+	defer db.Close()
 	go func() {
 	
 	err := sev.Serve()

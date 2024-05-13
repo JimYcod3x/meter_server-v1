@@ -2,9 +2,11 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/JimYcod3x/meter_server/internal/meter"
@@ -13,13 +15,15 @@ import (
 	"github.com/go-redis/redis/v8"
 	mqtt "github.com/mochi-mqtt/server/v2"
 	"github.com/mochi-mqtt/server/v2/packets"
-	"gorm.io/gorm"
+	"github.com/qustavo/dotsql"
 )
 
 const DefaultKey = "69aF7&3KY0_kk89@"
 
-var ctx = context.Background()
-var Meters models.Meter
+var (
+	ctx = context.Background()
+ Meters models.Meter
+)
 
 type Hook struct {
 	mqtt.HookBase
@@ -28,7 +32,7 @@ type Hook struct {
 
 type HookOptions struct {
 	Server *mqtt.Server
-	db     *gorm.DB
+	db     *sql.DB
 	rdb    *redis.Client
 }
 
@@ -106,19 +110,31 @@ func (h *Hook) OnPublish(cl *mqtt.Client, pk packets.Packet) (packets.Packet, er
 
 func (h *Hook) OnPublished(cl *mqtt.Client, pk packets.Packet) {
 	if cl.ID != "inline" && len(pk.Payload) >= 16 {
+		db := h.config.db
 		// if getMeterID from db else discard
 
 		// 	if getdatakey(getMeterID) from db else (if decrypt from default key get the request keyexchange command=> keyexchange)
 		// 		decrypt(datakey) => data transfer else decrypt(master key) get request change key command => response new datakey to meter =>
+		pwd, _ := os.Getwd()
+		dot, err := dotsql.LoadFromFile(pwd + "/sql/meter.sql")
+		if err != nil {
+			fmt.Println("can not load the sql script")
+		}
+		dot.Exec(db, "switch-to-database")
 		meterID := utils.GetMeterIDFromTopic(pk)
 		fmt.Println("get id from topic", meterID)
 		payload := pk.Payload
-		fmt.Println("what is the meters is", Meters)
 		meterExis, _ := h.config.rdb.Get(ctx, "*"+meterID).Result()
 		if len(meterExis) == 0 {
 			fmt.Println("meter not found in rdb")
-			err := h.config.db.First(&Meters, "meter_id = ?", meterID).Error
-			fmt.Println("meter result", Meters.MeterID)
+			// err := h.config.db.First(&Meters, "meter_id = ?", meterID).Error
+			res, _ := dot.QueryRow(db, "find-one-meter-by-meter_id", meterID)
+			err = res.Scan(&Meters.MeterID)
+			if err != nil {
+				fmt.Println("can not get the record from db")
+				return
+			}
+			fmt.Println("what is the meter.meterid", Meters.MeterID)
 			if Meters.MeterID != meterID || err != nil {
 				fmt.Println("Meter can not found in db, discard")
 				return
@@ -128,14 +144,14 @@ func (h *Hook) OnPublished(cl *mqtt.Client, pk packets.Packet) {
 		dataKey, _ := h.config.rdb.Get(ctx, "dk_"+meterID).Result()
 		if len(dataKey) == 0 {
 			fmt.Println("datakey can not found in rdb")
-			err := h.config.db.Where("meter_id = ?", meterID).First(&Meters.DataKey).Error
+			_, err := dot.QueryRow(db, "find-one-meter-dk-by-meter_id", meterID)
 			if err != nil {
 				fmt.Println("data key can not found in db")
 				// get master key from db
 				masterKey, _ := h.config.rdb.Get(ctx, "mk_"+meterID).Result()
 				if len(masterKey) == 0 {
 					fmt.Println("master key can not found in rdb")
-					err := h.config.db.Where("meter_id = ?", meterID).First(&Meters.MasterKey).Error
+					_, err := dot.QueryRow(db, "find-one-meter-mk-by-meter_id", meterID)
 					if err != nil {
 						fmt.Println("master key can not found in db")
 						// use default key to decrypt
@@ -173,9 +189,16 @@ func (h *Hook) OnPublished(cl *mqtt.Client, pk packets.Packet) {
 									fmt.Println("can not save to rdb")
 									return
 								}
-								err = h.config.db.Model(&models.Meter{}).Where("meter_id = ?", meterID).Update("master_key", materKey).Error
-								if err != nil {
-									fmt.Println("can not save mk to db")
+								// err = h.config.db.Model(&models.Meter{
+								// stmt, err := db.Prepare("UPDATE meter SET master_key = ? WHERE mete_id = ?")
+								// if err != nil {
+								// 	fmt.Println("can not save mk to db")
+								// 	return
+								// }
+								// defer stmt.Close()
+
+								// _, err = stmt.Exec(materKey, meterID)
+								if err = utils.UpdateKeyToDb(db, "master_key", materKey, meterID); err != nil {
 									return
 								}
 								err = h.config.rdb.Set(ctx, "mk_"+meterID, materKey, 24*time.Hour).Err()
@@ -230,10 +253,7 @@ func (h *Hook) OnPublished(cl *mqtt.Client, pk packets.Packet) {
 			fmt.Printf("command mk: %04b\n", command)
 			commandParam := decryptByteDK[8]
 			if command == meter.ReqACK && int(commandParam) == (meter.USCommandSet.ReqACK["ReqSucACK"]).(int) {
-				err := h.config.db.Model(&models.Meter{}).Where("meter_id = ?", meterID).Update("data_key", dataKey).Error
-				
-				if err != nil {
-					fmt.Println("can not save dk to db", err)
+				if utils.UpdateKeyToDb(db, "data_key", dataKey, meterID); err != nil {
 					return
 				}
 				err = h.config.rdb.Set(ctx, "dk_"+meterID, dataKey, 24*time.Hour).Err()
@@ -266,7 +286,7 @@ func (h *Hook) OnPublished(cl *mqtt.Client, pk packets.Packet) {
 			fmt.Printf("command mk: %04b\n", command)
 			commandParam := decryptByteMK[8]
 			fmt.Println("commandParam: ", commandParam)
-			if command == meter.ReqACK && commandParam == meter.USCommandSet.ReqACK["ReqChangeKey"] {
+			if command == meter.ReqACK && int(commandParam) == (meter.USCommandSet.ReqACK["ReqChangeKey"]).(int) {
 				publishPayload := meter.KeyXFn(pk, masterKey, "ReqChangeKey")
 				fmt.Println("preencrypt: ", publishPayload)
 				publishPayloadByte, err := utils.EncryptPadding(publishPayload, masterKey)

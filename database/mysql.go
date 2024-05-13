@@ -1,24 +1,21 @@
 package database
 
 import (
+	"database/sql"
 	"fmt"
-
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/JimYcod3x/meter_server/config"
-	"github.com/JimYcod3x/meter_server/models"
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
 )
 
-func ConnectionDB(config *config.Config) *gorm.DB {
+func ConnectionDB(config *config.Config) *sql.DB {
 	dsn := fmt.Sprintf("%s:%s@tcp(127.0.0.1:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local", config.DBUsername, config.DBPassword, config.DBName)
 	fmt.Println(dsn)
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	db, err := sql.Open("mysql",dsn)
 	if err != nil {
+		fmt.Println("can not connected to db", err)
 		return nil
 	}
-	if err := db.AutoMigrate(&models.Meter{}); err != nil {
-		panic("failed to auto migrate tables: " + err.Error())
-	}
+
 
 	fmt.Println("Connected Successful to the dabase(mysql)")
 

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -25,15 +26,16 @@ type Server struct {
 	*mqtt.Server
 }
 
-func Run(options *mqtt.Options) *mqtt.Server {
+func Run(options *mqtt.Options) (*mqtt.Server, *sql.DB){
 	loadConfig, err := config.LoadConfig(".")
 	if err != nil {
 		log.Fatal("cannot load environment variables", err)
 	}
 
 	db := database.ConnectionDB(&loadConfig)
-
 	rdb := database.ConnectionRedisDb(&loadConfig)
+
+	utils.InitDB(db)
 
 	utils.CreateMeter(db, "J23P000078", "IoT")
 	utils.CreateMeter(db, "J230008542", "PV")
@@ -65,7 +67,7 @@ func Run(options *mqtt.Options) *mqtt.Server {
 
 	// sev.Publish(tPub, meter.KeyExchange(), false, 2)
 
-	return sev
+	return sev, db
 }
 
 func subFn(cl *mqtt.Client, sub packets.Subscription, pk packets.Packet) {

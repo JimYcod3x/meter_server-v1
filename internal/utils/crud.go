@@ -2,17 +2,22 @@ package utils
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/JimYcod3x/meter_server/models"
 	"github.com/go-redis/redis/v8"
-	"gorm.io/gorm"
+	"github.com/qustavo/dotsql"
 )
 
-var meters models.Meter
-
+var(
+	meters models.Meter
+	pwd, _ = os.Getwd()
+	dot, err = dotsql.LoadFromFile(pwd + "/sql/meter.sql")
+) 
 func GetSerDataKey(meterID string) (dataKey string, found bool) {
 	dataKey, err := FindDateKey(meterID)
 	found = false
@@ -50,21 +55,32 @@ func FindMasterKey(meterID string) (masterKey string, err error) {
 	return
 }
 
-func CreateMeter(db *gorm.DB, meterID string, meterType string) error {
-	fmt.Println("create the meter")
-	meters := models.Meter{
-		MeterID:   meterID,
-		MeterType: meterType,
-	}
-	err := db.First(&meters, "meter_id = ?", meterID).Error
-	if err != nil {
-		fmt.Println(err)
-		return db.Model(models.Meter{}).Create(&meters).Error
-	}
-	fmt.Println(meters)
-	// if err := db.First(&models.User{Email: payload.Email}).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+func InitDB(db *sql.DB) {
+	fmt.Println("Init the meter db")
+	res, err := dot.Exec(db, "create-database")
+	checkErr(err)
+	fmt.Println(res.LastInsertId())
+	res, err = dot.Exec(db, "switch-to-database")
+	checkErr(err)
+	fmt.Println(res.LastInsertId())
+	res, err = dot.Exec(db, "create-meter-table")
+	checkErr(err)
+	fmt.Println(res.LastInsertId())
+}
 
-	// }
+func CreateMeter(db *sql.DB, meterID string, meterType string) error {
+	fmt.Println("create the meter")
+
+	if err != nil {
+		fmt.Println("can not load the sql file", err)
+	}
+	res, err := dot.Exec(db, "create-meter", meterID, meterType)
+	if err != nil {
+		fmt.Println("can not create the meter", err)
+		return err
+	}
+	fmt.Println(res.LastInsertId())
+
 	return nil
 }
 
@@ -74,4 +90,26 @@ func SaveToRdb(rdb *redis.Client, ctx context.Context, meterID string, key strin
 		fmt.Println("can not save to rdb", err)
 	}
 	return err
+}
+
+func UpdateKeyToDb(db *sql.DB, key string, args ...any) error {
+	stmt, err := db.Prepare("UPDATE meter SET " + key + " = ? WHERE mete_id = ?")
+	if err != nil {
+		fmt.Println("prepare the " + key + " to db")
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(key)
+	if err != nil {
+		fmt.Println("can not save " + key + " to db")
+		return err
+	}
+	return nil
+}
+
+func checkErr(err error) {
+	if err != nil {
+		fmt.Println(err)
+	}
 }
