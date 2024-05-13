@@ -155,7 +155,6 @@ func (h *Hook) OnPublished(cl *mqtt.Client, pk packets.Packet) {
 					if err != nil {
 						fmt.Println("master key can not found in db")
 						// use default key to decrypt
-						fmt.Println("can not find the masterkey in rdb")
 
 						valid := utils.ValidateMeter(meterID, payload, DefaultKey)
 						fmt.Println("testvvalid", valid)
