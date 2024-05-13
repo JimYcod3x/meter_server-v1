@@ -77,12 +77,11 @@ func CreateMeter(db *sql.DB, meterID string, meterType string) error {
 	res, _ := dot.QueryRow(db, "find-one-meter-by-meter_id", meterID)
 	err = res.Scan(&meters.MeterID)
 	if err == sql.ErrNoRows {
-		res, err := dot.Exec(db, "create-meter", meterID, meterType)
+		_, err := dot.Exec(db, "create-meter", meterID, meterType)
 		if err != nil {
 			fmt.Println("can not create the meter", err)
 			return err
 		}
-		fmt.Println(res.LastInsertId())
 		return nil
 	}
 	
