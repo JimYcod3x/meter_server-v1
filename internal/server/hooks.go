@@ -154,6 +154,7 @@ func (h *Hook) OnPublished(cl *mqtt.Client, pk packets.Packet) {
 					fmt.Println("master key can not found in rdb")
 					res, _ := dot.QueryRow(db, "find-one-meter-mk-by-meter_id", meterID)
 					err = res.Scan(&Meters.MeterID)
+					fmt.Println("what is the err of this line", err)
 					if err == sql.ErrNoRows {
 						fmt.Println("master key can not found in db")
 						// use default key to decrypt
