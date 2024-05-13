@@ -101,7 +101,7 @@ func SaveToRdb(rdb *redis.Client, ctx context.Context, meterID string, key strin
 func UpdateKeyToDb(db *sql.DB, key string, args ...any) error {
 	stmt, err := db.Prepare("UPDATE meter SET " + key + " = ? WHERE mete_id = ?")
 	if err != nil {
-		fmt.Println("prepare the " + key + " to db")
+		fmt.Println("prepare the " + key + " to db", err)
 		return err
 	}
 	defer stmt.Close()
