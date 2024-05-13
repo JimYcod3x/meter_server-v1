@@ -127,8 +127,8 @@ func (h *Hook) OnPublished(cl *mqtt.Client, pk packets.Packet) {
 		fmt.Println("get id from topic", meterID)
 		payload := pk.Payload
 		fmt.Println("get the meter from rdb")
-		meterExis, _ := rdb.Get(ctx, "*"+meterID).Result()
-		if len(meterExis) == 0 {
+		_, err = rdb.Keys(ctx, "*"+meterID).Result()
+		if err != nil {
 			fmt.Println("meter not found in rdb")
 			// err := h.config.db.First(&Meters, "meter_id = ?", meterID).Error
 			fmt.Println("get meter from db")
