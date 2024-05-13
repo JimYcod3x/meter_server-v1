@@ -41,6 +41,11 @@ func Run(options *mqtt.Options) (*mqtt.Server, *sql.DB){
 	utils.CreateMeter(db, "J230008542", "PV")
 	utils.CreateMeter(db, "J200002335", "PV")
 
+	// err = utils.UpdateKeyToDb(db, "master_key", "J23P000078000000", "J23P000078")
+	// if err != nil {
+	// 	fmt.Println("what is the error", err)
+	// }
+
 
 	// var ctx = context.Background()
 	// utils.SaveToRdb(rdb, ctx, "J23P000078","J23P000078"+ "000000")
